@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Homepage</title>
+</head>
+
+<style type="text/css">
+    ._main{
+        margin: 0 auto;
+    }
+    ._header{
+        display:flex;
+        width:100vw;
+        height:8vh;
+        font-size:20px;
+    }
+    #_menu{
+        display: flex;
+        flex-direction: column;
+        width:220px;
+        height:90vh;
+        float:left;
+        font-size:18px;
+    }
+    #_excute_block{
+        width:calc(100vw - 220px - 1em);
+        height:90vh;
+        margin-left:220px;
+    }
+    table, th, td{
+        border: 1px solid #858585;
+        border-collapse: collapse;
+    }
+    th{
+        color:#00e6a6;
+        background-color:#999999;
+        height:55px;
+    }
+</style>
+
+<body marginwidth="0"
+      style="background:#E0E0E0;">
+
+<header class="_header">
+    <a href="SPHapp.html"
+       style="padding:1em; color: #606060; text-decoration: none; font-weight:bold; align-content: space-around;">SPH solver manual & UI interface</a>
+</header>
+<div class="_main">
+    <aside id="_menu">
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #00e6a6; font-weight:bold; text-decoration: none;"
+           >Voxels</a>
+            <a style="padding-left:2em; padding-top:0.5em; padding-bottom:0.5em; height: 30px; background-color: #858585; color: #FFD812; font-weight:bold; text-decoration: none;"
+               href="voxels_1.html">obj creation</a>
+            <a style="padding-left:2em; padding-top:0.5em; padding-bottom:0.5em; height: 30px; background-color: #858585; color: #FFD812; font-weight:bold; text-decoration: none;"
+               href="voxels_2.html">test.py</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="boundary.html">Boundary</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="inlet.html">Inlet</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="sphsolver.html">SPHsolver</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="analysis.html">Data analysis</a>
+        <a style="padding-top: 1em; height: calc(90vh - 250px - 5em); background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"> </a>
+    </aside>
+
+    <section id="_excute_block">
+        <table style="margin-left:3vw; width:75vw;">
+
+            <tr>
+                <th>Order</th>
+                <th>Alphabet</th>
+                <th>Meaning</th>
+                <th>Interval</th>
+                <th>Default value</th>
+            </tr>
+
+            <tbody>
+                <tr>
+                    <td><p>(1)</p></td>
+                    <td><p>K</p></td>
+                    <td><p>objectの一番細い部分</p></td>
+                    <td><p>0.001</p></td>
+                    <td><p>0.001</p></td>
+                </tr>
+                <tr>
+                    <td><p>(2)</p></td>
+                    <td><p>H</p></td>
+                    <td>
+                        <p>Voxel size &#8776; 10R</br>
+                           K/4 &lt; H &lt; K/2</br>
+                           test.pyで決定した値</p>
+                    </td>
+                    <td><p>0.00025 &lt; H &lt; 0.0005 </br>
+                           H=10R = 10×0.00005</br>
+                           Total Voxels数が30万点以下になるならよい.100万点までOK.</p>
+                    </td>
+                    <td><p>0.0005</p></td>
+                </tr>
+                <tr>
+                    <td><p>(3)</p></td>
+                    <td><p>R</p></td>
+                    <td>
+                        <p>粒子の半径</br>
+                           K/40 &lt; R &#8776; K/20</br>
+                           0.000025 &lt; R &lt; 0.00005</p>
+                    </td>
+                    <td><p>R &#8776; 0.00008</p>
+                    </td>
+                    <td><p>0.00008</p></td>
+                </tr>
+                <tr>
+                    <td><p>(4)</p></td>
+                    <td><p>2R</p></td>
+                    <td>
+                        <p>Remesh size: 2R</p>
+                    </td>
+                    <td><p>粒子径の2倍</p></td>
+                    <td><p>0.00016</p></td>
+                </tr>
+                <tr>
+                    <td><p></p></td>
+                    <td><p>r</p></td>
+                    <td>
+                        <p>???</p>
+                    </td>
+                    <td><p>???</p></td>
+                    <td><p>0.002</p></td>
+                </tr>
+                <tr>
+                    <td><p></p></td>
+                    <td><p>r_2</p></td>
+                    <td>
+                        <p>???</p>
+                    </td>
+                    <td><p>???</p></td>
+                    <td><p>0.00168</p></td>
+                </tr>
+                <tr>
+                    <td><p></p></td>
+                    <td><p>mm/s</p></td>
+                    <td><p>Flow velocity</p></td>
+                    <td><p>???</p></td>
+                    <td><p>0.3424-x</p></td>
+                </tr>
+                <tr>
+                    <td><p></p></td>
+                    <td><p>C0</p></td>
+                    <td><p>Initial velocity</p></td>
+                    <td><p>???</p></td>
+                    <td><p>50</p></td>
+                </tr>
+            </tbody>
+
+        </table>
+    </section>
+
+</div>
+
+</body>
+</html>

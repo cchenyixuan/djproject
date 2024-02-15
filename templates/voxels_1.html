@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Homepage</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js" integrity="sha512-n8IpKWzDnBOcBhRlHirMZOUvEq2bLRMuJGjuVqbzUJwtTsgwOgK5aS0c1JA647XWYfqvXve8k3PtZdzpipFjgg==" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/controls/OrbitControls.js"></script>
+
+
+</head>
+
+<style type="text/css">
+    ._main{
+        margin: 0 auto;
+    }
+    ._header{
+        display:flex;
+        width:100vw;
+        height:8vh;
+        font-size:20px;
+    }
+    #_menu{
+        display: flex;
+        flex-direction: column;
+        width:220px;
+        height: 90vh;
+        float:left;
+        font-size:18px;
+    }
+    #_excute_block{
+        width: calc(100vw - 220px - 1em);
+        height: 90vh;
+        margin-left: 220px;
+    }
+    #cameraCombined{
+        display: inline-flex;
+        vertical-align: top;
+        line-height:22px;
+    }
+
+
+</style>
+
+<body marginwidth="0"
+      style="background:#E0E0E0;">
+
+<header class="_header">
+    <a href="SPHapp.html"
+       style="padding:1em; color: #606060; text-decoration: none; font-weight:bold; align-content: space-around;">SPH solver manual & UI interface</a>
+</header>
+<div class="_main">
+    <aside id="_menu">
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="voxels.html">Voxels</a>
+            <a style="padding-left:2em; padding-top:0.5em; padding-bottom:0.5em; height: 30px; background-color: #858585; color: #00e6a6; font-weight:bold; text-decoration: none;"
+               >obj creation</a>
+            <a style="padding-left:2em; padding-top:0.5em; padding-bottom:0.5em; height: 30px; background-color: #858585; color: #FFD812; font-weight:bold; text-decoration: none;"
+               href="voxels_2.html">test.py</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="boundary.html">Boundary</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="inlet.html">Inlet</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="sphsolver.html">SPHsolver</a>
+        <a style="padding-left:1em; padding-top: 1em; height: 50px; background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"
+           href="analysis.html">Data analysis</a>
+        <a style="padding-top: 1em; height: calc(90vh - 250px - 5em); background-color: #999999; color: #FFD812; font-weight:bold; text-decoration: none;"> </a>
+    </aside>
+
+    <section id="_excute_block">
+
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <label for="fileInput">Choose a file:</label>
+            <input type="file" id="fileInput" name="fileInput" style="display: none;" onchange="updateFilePath()">
+            <input type="text" id="filePath" name="filePath" readonly>
+            <button type="button" onclick="document.getElementById('fileInput').click();">Browse</button>
+            <button type="submit">Upload</button>
+        </form>
+
+
+        <br>
+        <div id="cameraInfoDiv" style="position: static; color: black;">
+            <label for="cameraCombined">Position&Rotation:</label>
+            <textarea id="cameraCombined" rows="2">0.00,0.00,5.00&#10;0.00,0.00,0.00 </textarea>
+            <br>
+        </div>
+        <button id="updateCameraButton">Update Camera</button>
+        <button onclick="resetCameraY()">Reset Camera Y</button>
+        <button onclick="resetCameraX()">Reset Camera X</button>
+        <button onclick="resetCameraZ()">Reset Camera Z</button></br>
+
+        <canvas id="webgl-canvas"></canvas>
+
+
+    </section>
+
+
+
+</div>
+
+
+<script>
+    function updateFilePath() {
+        const filePath = document.getElementById('fileInput').value;
+        const fileName = filePath.split('\\').pop();
+        document.getElementById('filePath').value = fileName;
+    }
+</script>
+
+<script type="text/javascript">
+    window.onload = function() {
+            // Get the WebGL context
+            const canvas = document.getElementById('webgl-canvas');
+            canvas.width = 1280;
+            canvas.height = 720;
+            const gl = canvas.getContext('webgl');
+            if (!gl) {
+                console.error('Unable to initialize WebGL. Your browser may not support it.');
+                return;
+            }
+
+            // Set up shaders
+            const vertexShaderSource = `
+                attribute vec4 a_position;
+                uniform mat4 p_matrix;
+                uniform mat4 v_matrix;
+                void main() {
+                    gl_Position = p_matrix*v_matrix*a_position;
+                }
+            `;
+            const fragmentShaderSource = `
+                void main() {
+                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                }
+            `;
+
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexShaderSource);
+            gl.compileShader(vertexShader);
+
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource);
+            gl.compileShader(fragmentShader);
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+            gl.useProgram(shaderProgram);
+
+            const p_matrix_loc = gl.getUniformLocation(shaderProgram, 'p_matrix')
+
+            const p_matrix = new Float32Array([
+                0.73306427, 0, 0, 0,  // First column
+                0, 1.30322537, 0, 0,  // Second column
+                0, 0, -1.000002, -1,  // Third column
+                0, 0, -0.002, 0   // Fourth column
+            ]);
+            const v_matrix_loc = gl.getUniformLocation(shaderProgram, "v_matrix")
+            const v_matrix = new Float32Array([
+                1.,   0.,  -0.,   0.,
+                -0.,   1.,  -0.,   0.,
+                0.,   0.,   1.,   0.,
+                -0.,  -0., -10.,   1.
+            ]);
+            gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+            gl.uniformMatrix4fv(p_matrix_loc, false, p_matrix);
+
+            // Set up geometry
+            const vertices = new Float32Array([
+                -0.5, -0.5,0.0, 1.0,
+                0.5, -0.5,0.0, 1.0,
+                0.0, 0.5,0.0,1.0
+            ]);
+            const vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            const positionAttribLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+            gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(positionAttribLocation);
+
+            // rotate para
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            // Event listener for mouse down event
+            canvas.addEventListener('mousedown', (event) => {
+                if (event.button === 0) { // Left mouse button
+                    isDragging = true;
+                    lastX = event.clientX;
+                    lastY = event.clientY;
+                }
+            });
+
+            // Event listener for mouse up event
+            canvas.addEventListener('mouseup', (event) => {
+                if (event.button === 0) { // Left mouse button
+                    isDragging = false;
+                }
+            });
+
+            // Event listener for mouse move event
+            canvas.addEventListener('mousemove', (event) => {
+                if (isDragging) {
+                    const deltaX = event.clientX - lastX;
+                    const deltaY = event.clientY - lastY;
+
+                    // Send data to Django backend
+                fetch('cursor_movement_callback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken') // Include CSRF token if CSRF protection is enabled in Django
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                    // Perform rotation based on deltaX and deltaY
+                    // Update your camera or model matrix here using deltaX and deltaY
+
+                    lastX = event.clientX;
+                    lastY = event.clientY;
+                    document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
+                    gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+                }
+            });
+
+
+
+
+
+            // Rendering loop
+            function render() {
+                gl.clearColor(1.0, 1.0, 1.0, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+
+                gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+                requestAnimationFrame(render);
+            }
+
+            render();
+        };
+</script>
+
+
+</body>
+</html>
