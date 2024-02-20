@@ -18,7 +18,7 @@ class Camera:
         self.up = pyrr.Vector4([0.0, 1.0, 0.0, 1.0])
         self.lookat = pyrr.Vector4([0.0, 0.0, 0.0, 1.0])
         self.projection_type = projection_type
-        self.screen_ratio = 1920 / 1080
+        self.screen_ratio = 1280/720
         self.distance = np.linalg.norm(self.position - self.lookat)
 
         self.projection_changed = False
@@ -40,8 +40,10 @@ class Camera:
         # self.mouse_middle = False
         # self.mouse_right = False
         self.mouse_pos = pyrr.Vector3([0.0, 0.0, 0.0])
+        print("Camera Initialized.")
 
     def __call__(self, delta=pyrr.Vector3([0.0, 0.0, 0.0]), flag=None):
+        print(delta)
         # left: rotate/spin
         if flag == "left":  # and self.mouse_left:
             self.operate_rotate(delta)
@@ -107,7 +109,7 @@ class Camera:
 
     def operate_zoom(self, delta):
         def smooth_zoom():
-            for i in range(20):
+            for i in range(1):
                 self.position += self.front * delta.y * 0.02 * min(1.0, np.linalg.norm(
                     self.position - self.lookat))
                 self.position = pyrr.Vector4([*self.position.xyz, 1.0])

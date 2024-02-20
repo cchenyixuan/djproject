@@ -152,13 +152,13 @@
             const p_matrix_loc = gl.getUniformLocation(shaderProgram, 'p_matrix')
 
             const p_matrix = new Float32Array([
-                0.73306427, 0, 0, 0,  // First column
-                0, 1.30322537, 0, 0,  // Second column
-                0, 0, -1.000002, -1,  // Third column
-                0, 0, -0.002, 0   // Fourth column
+                1.35799513e+00, 0, 0, 0,  // First column
+                0, 2.41421356e+00, 0, 0,  // Second column
+                0, 0, -1.00000200e+00, -1,  // Third column
+                0, 0, -2.00000200e-03, 0   // Fourth column
             ]);
             const v_matrix_loc = gl.getUniformLocation(shaderProgram, "v_matrix")
-            const v_matrix = new Float32Array([
+            let v_matrix = new Float32Array([
                 1.,   0.,  -0.,   0.,
                 -0.,   1.,  -0.,   0.,
                 0.,   0.,   1.,   0.,
@@ -181,14 +181,20 @@
             gl.enableVertexAttribArray(positionAttribLocation);
 
             // rotate para
-            let isDragging = false;
+            let leftClicked = false;
+            let middleClicked = false;
             let lastX = 0;
             let lastY = 0;
 
             // Event listener for mouse down event
             canvas.addEventListener('mousedown', (event) => {
                 if (event.button === 0) { // Left mouse button
-                    isDragging = true;
+                    leftClicked = true;
+                    lastX = event.clientX;
+                    lastY = event.clientY;
+                }
+                if (event.button === 1) { // Middle mouse button
+                    middleClicked = true;
                     lastX = event.clientX;
                     lastY = event.clientY;
                 }
@@ -197,32 +203,76 @@
             // Event listener for mouse up event
             canvas.addEventListener('mouseup', (event) => {
                 if (event.button === 0) { // Left mouse button
-                    isDragging = false;
+                    leftClicked = false;
+                }
+                if (event.button === 1) { // Left mouse button
+                    middleClicked = false;
                 }
             });
+            // Event listener for mouse wheel event
+            canvas.addEventListener('wheel', (event) => {
+                // Send data to Django backend
+                fetch('', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: `pos_x=${event.deltaX}&pos_y=${event.deltaY*-0.1}&flag=${"wheel"}`
+                }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
+                gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+            });
+
 
             // Event listener for mouse move event
             canvas.addEventListener('mousemove', (event) => {
-                if (isDragging) {
+                if (leftClicked) {
                     const deltaX = event.clientX - lastX;
                     const deltaY = event.clientY - lastY;
 
                     // Send data to Django backend
-                fetch('cursor_movement_callback', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken') // Include CSRF token if CSRF protection is enabled in Django
-                    },
-                    body: JSON.stringify(data)
-                });
+                    fetch('', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: `pos_x=${deltaX}&pos_y=${deltaY}&flag=${"left"}`
+                    }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
+                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                    // console.log();
 
                     // Perform rotation based on deltaX and deltaY
                     // Update your camera or model matrix here using deltaX and deltaY
 
                     lastX = event.clientX;
                     lastY = event.clientY;
-                    document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
+                    gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+                }
+                if (middleClicked) {
+                    const deltaX = event.clientX - lastX;
+                    const deltaY = event.clientY - lastY;
+
+                    // Send data to Django backend
+                    fetch('', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: `pos_x=${-deltaX*0.1}&pos_y=${deltaY*0.1}&flag=${"middle"}`
+                    }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
+                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                    // console.log();
+
+                    // Perform rotation based on deltaX and deltaY
+                    // Update your camera or model matrix here using deltaX and deltaY
+
+                    lastX = event.clientX;
+                    lastY = event.clientY;
+                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
 
                     gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
                 }

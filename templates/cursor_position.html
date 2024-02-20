@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursor Position</title>
+</head>
+<body>
+    <h1>Cursor Position</h1>
+    <p>Current cursor position: <span id="cursor-position"></span></p>
+    <script>
+        document.addEventListener('mousemove', function(event) {
+            var cursorPosition = document.getElementById('cursor-position');
+            cursorPosition.textContent = `(${event.clientX}, ${event.clientY})`;
+            fetch('', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `pos_x=${event.clientX}&pos_y=${event.clientY}`
+            });
+        });
+    </script>
+</body>
+</html>
