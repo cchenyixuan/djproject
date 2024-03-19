@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-e3o#ylrmt24*2kgz^h_7&s%zjau25a(3sn%ele@2m5848_*_3e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['172.25.25.60', '*', "100.83.2.250"]
 
 
 # Application definition
@@ -111,6 +111,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+
+STATICFILES_DIRS = [
+    'templates/shaders',
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

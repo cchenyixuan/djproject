@@ -109,108 +109,181 @@
 </script>
 
 <script type="text/javascript">
-    window.onload = function() {
-            // Get the WebGL context
-            const canvas = document.getElementById('webgl-canvas');
-            canvas.width = 1280;
-            canvas.height = 720;
-            const gl = canvas.getContext('webgl');
-            if (!gl) {
-                console.error('Unable to initialize WebGL. Your browser may not support it.');
-                return;
+    window.onload = async function () {
+        // Get the WebGL context
+        const canvas = document.getElementById('webgl-canvas');
+        canvas.width = 1280;
+        canvas.height = 720;
+
+        const gl = canvas.getContext('webgl2');
+        if (!gl) {
+            console.error('Unable to initialize WebGL. Your browser may not support it.');
+            return;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+
+        // Set up shaders
+        const vertexShaderSource = await fetch("shaders/vertex.vert").then(res => res.json()).then(res => res["data"]).then(res => {
+            return res
+        });
+        const fragmentShaderSource = await fetch("shaders/fragment.frag").then(res => res.json()).then(res => res["data"]).then(res => {
+            return res
+        });
+
+
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexShaderSource);
+        gl.compileShader(vertexShader);
+        console.log(gl.getShaderInfoLog(vertexShader));
+
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentShaderSource);
+        gl.compileShader(fragmentShader);
+        //console.log(gl.getShaderInfoLog(fragmentShader));
+
+        const shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        gl.useProgram(shaderProgram);
+
+        const p_matrix_loc = gl.getUniformLocation(shaderProgram, 'projection')
+        const v_matrix_loc = gl.getUniformLocation(shaderProgram, "view")
+        const p_matrix = new Float32Array([
+            1.35799513e+00, 0, 0, 0,  // First column
+            0, 2.41421356e+00, 0, 0,  // Second column
+            0, 0, -1.00000200e+00, -1,  // Third column
+            0, 0, -2.00000200e-03, 0   // Fourth column
+        ]);
+
+        let v_matrix = new Float32Array([
+            1., 0., -0., 0.,
+            -0., 1., -0., 0.,
+            0., 0., 1., 0.,
+            -0., -0., -10., 1.
+        ]);
+
+        const time_loc = gl.getUniformLocation(shaderProgram, "time")
+        const scene_type_loc = gl.getUniformLocation(shaderProgram, "scene_type")
+
+        gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+        gl.uniformMatrix4fv(p_matrix_loc, false, p_matrix);
+
+        // Set up geometry
+        // Axis
+        const Axis_vertices = await fetch("a.obj/").then(res => res.json()).then(res => Float32Array.from(res["vertices"])).then(res => {
+            return res
+        });
+        const Axis_indices = await fetch("a.obj/").then(res => res.json()).then(res => Uint32Array.from(res["indices"])).then(res => {
+            return res
+        });
+
+
+        const Axis_VAO = gl.createVertexArray()
+        gl.bindVertexArray(Axis_VAO);
+
+        const Axis_VBO = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, Axis_VBO);
+        gl.bufferData(gl.ARRAY_BUFFER, Axis_vertices, gl.STATIC_DRAW);
+
+
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 0);
+
+        const Axis_EBO = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Axis_EBO);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Axis_indices, gl.STATIC_DRAW);
+
+        // Scene
+        let Scene_vertices = await fetch("cube.obj/").then(res => res.json()).then(res => Float32Array.from(res["vertices"])).then(res => {
+            return res
+        });
+        let Scene_indices = await fetch("cube.obj/").then(res => res.json()).then(res => Uint32Array.from(res["indices"])).then(res => {
+            return res
+        });
+
+
+        const Scene_VAO = gl.createVertexArray()
+        gl.bindVertexArray(Scene_VAO);
+
+        const Scene_VBO = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, Scene_VBO);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(300000), gl.DYNAMIC_DRAW);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, Scene_vertices, 0);
+
+
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 0);
+
+        const Scene_EBO = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Scene_EBO);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(300000), gl.DYNAMIC_DRAW);
+        gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, Scene_indices, 0);
+
+
+        //const vertexBuffer = gl.createBuffer();
+        //gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        //gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        //const positionAttribLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+        //gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
+        //gl.enableVertexAttribArray(positionAttribLocation);
+
+        // rotate para
+        let leftClicked = false;
+        let middleClicked = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // Event listener for mouse down event
+        canvas.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left mouse button
+                leftClicked = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
             }
+            if (event.button === 1) { // Middle mouse button
+                middleClicked = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
+            }
+        });
 
-            // Set up shaders
-            const vertexShaderSource = `
-                attribute vec4 a_position;
-                uniform mat4 p_matrix;
-                uniform mat4 v_matrix;
-                void main() {
-                    gl_Position = p_matrix*v_matrix*a_position;
-                }
-            `;
-            const fragmentShaderSource = `
-                void main() {
-                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-                }
-            `;
-
-            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertexShader, vertexShaderSource);
-            gl.compileShader(vertexShader);
-
-            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragmentShader, fragmentShaderSource);
-            gl.compileShader(fragmentShader);
-
-            const shaderProgram = gl.createProgram();
-            gl.attachShader(shaderProgram, vertexShader);
-            gl.attachShader(shaderProgram, fragmentShader);
-            gl.linkProgram(shaderProgram);
-            gl.useProgram(shaderProgram);
-
-            const p_matrix_loc = gl.getUniformLocation(shaderProgram, 'p_matrix')
-
-            const p_matrix = new Float32Array([
-                1.35799513e+00, 0, 0, 0,  // First column
-                0, 2.41421356e+00, 0, 0,  // Second column
-                0, 0, -1.00000200e+00, -1,  // Third column
-                0, 0, -2.00000200e-03, 0   // Fourth column
-            ]);
-            const v_matrix_loc = gl.getUniformLocation(shaderProgram, "v_matrix")
-            let v_matrix = new Float32Array([
-                1.,   0.,  -0.,   0.,
-                -0.,   1.,  -0.,   0.,
-                0.,   0.,   1.,   0.,
-                -0.,  -0., -10.,   1.
-            ]);
+        // Event listener for mouse up event
+        canvas.addEventListener('mouseup', (event) => {
+            if (event.button === 0) { // Left mouse button
+                leftClicked = false;
+            }
+            if (event.button === 1) { // Left mouse button
+                middleClicked = false;
+            }
+        });
+        // Event listener for mouse wheel event
+        canvas.addEventListener('wheel', (event) => {
+            // Send data to Django backend
+            fetch('', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `pos_x=${event.deltaX}&pos_y=${event.deltaY * -0.1}&flag=${"wheel"}`
+            }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
             gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
-            gl.uniformMatrix4fv(p_matrix_loc, false, p_matrix);
+        });
 
-            // Set up geometry
-            const vertices = new Float32Array([
-                -0.5, -0.5,0.0, 1.0,
-                0.5, -0.5,0.0, 1.0,
-                0.0, 0.5,0.0,1.0
-            ]);
-            const vertexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-            const positionAttribLocation = gl.getAttribLocation(shaderProgram, 'a_position');
-            gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(positionAttribLocation);
 
-            // rotate para
-            let leftClicked = false;
-            let middleClicked = false;
-            let lastX = 0;
-            let lastY = 0;
+        // Event listener for mouse move event
+        canvas.addEventListener('mousemove', (event) => {
+            if (leftClicked) {
+                const deltaX = event.clientX - lastX;
+                const deltaY = event.clientY - lastY;
 
-            // Event listener for mouse down event
-            canvas.addEventListener('mousedown', (event) => {
-                if (event.button === 0) { // Left mouse button
-                    leftClicked = true;
-                    lastX = event.clientX;
-                    lastY = event.clientY;
-                }
-                if (event.button === 1) { // Middle mouse button
-                    middleClicked = true;
-                    lastX = event.clientX;
-                    lastY = event.clientY;
-                }
-            });
-
-            // Event listener for mouse up event
-            canvas.addEventListener('mouseup', (event) => {
-                if (event.button === 0) { // Left mouse button
-                    leftClicked = false;
-                }
-                if (event.button === 1) { // Left mouse button
-                    middleClicked = false;
-                }
-            });
-            // Event listener for mouse wheel event
-            canvas.addEventListener('wheel', (event) => {
                 // Send data to Django backend
                 fetch('', {
                     method: 'POST',
@@ -218,82 +291,96 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': '{{ csrf_token }}'
                     },
-                    body: `pos_x=${event.deltaX}&pos_y=${event.deltaY*-0.1}&flag=${"wheel"}`
-                }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
+                    body: `pos_x=${deltaX}&pos_y=${deltaY}&flag=${"left"}`
+                }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                // console.log();
+
+                // Perform rotation based on deltaX and deltaY
+                // Update your camera or model matrix here using deltaX and deltaY
+
+                lastX = event.clientX;
+                lastY = event.clientY;
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
                 gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
-            });
-
-
-            // Event listener for mouse move event
-            canvas.addEventListener('mousemove', (event) => {
-                if (leftClicked) {
-                    const deltaX = event.clientX - lastX;
-                    const deltaY = event.clientY - lastY;
-
-                    // Send data to Django backend
-                    fetch('', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: `pos_x=${deltaX}&pos_y=${deltaY}&flag=${"left"}`
-                    }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
-                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
-                    // console.log();
-
-                    // Perform rotation based on deltaX and deltaY
-                    // Update your camera or model matrix here using deltaX and deltaY
-
-                    lastX = event.clientX;
-                    lastY = event.clientY;
-                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
-
-                    gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
-                }
-                if (middleClicked) {
-                    const deltaX = event.clientX - lastX;
-                    const deltaY = event.clientY - lastY;
-
-                    // Send data to Django backend
-                    fetch('', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: `pos_x=${-deltaX*0.1}&pos_y=${deltaY*0.1}&flag=${"middle"}`
-                    }).then(res=>res.json()).then(res=>v_matrix=Float32Array.from(res["view"]));
-                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
-                    // console.log();
-
-                    // Perform rotation based on deltaX and deltaY
-                    // Update your camera or model matrix here using deltaX and deltaY
-
-                    lastX = event.clientX;
-                    lastY = event.clientY;
-                    // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
-
-                    gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
-                }
-            });
-
-
-
-
-
-            // Rendering loop
-            function render() {
-                gl.clearColor(1.0, 1.0, 1.0, 1.0);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-
-                gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-                requestAnimationFrame(render);
             }
+            if (middleClicked) {
+                const deltaX = event.clientX - lastX;
+                const deltaY = event.clientY - lastY;
 
-            render();
-        };
+                // Send data to Django backend
+                fetch('', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: `pos_x=${-deltaX * 0.2}&pos_y=${deltaY * 0.2}&flag=${"middle"}`
+                }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                // console.log();
+
+                // Perform rotation based on deltaX and deltaY
+                // Update your camera or model matrix here using deltaX and deltaY
+
+                lastX = event.clientX;
+                lastY = event.clientY;
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
+                gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+            }
+        });
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.enable(gl.DEPTH_TEST);
+        // Rendering loop
+        const t = Date.now();
+        let todo = 0;
+        async function update(i) {
+
+            if (i>3) {
+                i = 3;
+            }
+            if(todo===i){return}
+            todo = i;
+            Scene_vertices = await fetch("cube"+i+".obj/").then(res => res.json()).then(res => Float32Array.from(res["vertices"])).then(res => {
+                return res
+            });
+            Scene_indices = await fetch("cube"+i+".obj/").then(res => res.json()).then(res => Uint32Array.from(res["indices"])).then(res => {
+                return res
+            });
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, Scene_VBO);
+            gl.bufferData(gl.ARRAY_BUFFER, Scene_vertices, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Scene_EBO);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Scene_indices, gl.STATIC_DRAW);
+        }
+
+        function render() {
+            gl.clearColor(1.0, 1.0, 1.0, 1.0);
+            gl.uniform1f(time_loc, Date.now()-t)
+
+            gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+            // axis-rendering
+            gl.uniform1i(scene_type_loc, 0);
+            gl.bindVertexArray(Axis_VAO);
+            gl.drawElements(gl.TRIANGLES, Axis_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+            // scene rendering
+            gl.uniform1i(scene_type_loc, 1);
+            gl.bindVertexArray(Scene_VAO);
+            gl.drawElements(gl.TRIANGLES, Scene_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+
+            update(Math.floor((Date.now()-t)/ 10000));
+
+
+
+            requestAnimationFrame(render);
+        }
+
+        render();
+    };
 </script>
 
 

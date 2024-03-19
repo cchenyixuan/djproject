@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Homepage</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js" integrity="sha512-n8IpKWzDnBOcBhRlHirMZOUvEq2bLRMuJGjuVqbzUJwtTsgwOgK5aS0c1JA647XWYfqvXve8k3PtZdzpipFjgg==" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/controls/OrbitControls.js"></script>
+
+
+</head>
+
+<style type="text/css">
+    ._header{
+        display:flex;
+        width:100vw;
+        height:2%;
+        font-size:20px;
+    }
+    ._main .left{
+        margin:0 0 0 2px;
+        float:left;
+        width:220px;
+        height:90vh;
+        font-family: Calibri;
+    }
+    #uploadForm{
+        height:90px;
+        display: table;
+        margin:1em 0 0 1em;
+    }
+
+    #message{
+        margin:0 0 0 1.5em;
+        font-size: 12px;
+        color: crimson;
+    }
+    #volume{
+        margin:0 0 0 1.5em;
+        font-size: 16px;
+        font-weight: bold;
+        color: #606060;
+    }
+    #warning{
+        margin:0 0 0 0.2em;
+        font-size: 12px;
+        color: crimson;
+    }
+    #volume_error{
+        margin:0 0 0 0.2em;
+        font-size: 12px;
+        color: crimson;
+    }
+    #computeForm{
+        margin:0 0 0 1em;
+        display: table;
+    }
+    #results{
+        margin:0 0 0 1em;
+        display: table;
+    }
+    .row{
+        height:30px;
+        display: table-row;
+    }
+    #_up_row{
+        display: inline-block;
+    }
+    ._main .right{
+        float:left;
+        width:calc(99% - 220px);
+        height:90vh;
+    }
+    textarea#volume {
+        width:99%;
+        height:100%;
+        margin-left: 0;
+        font-size: 16px;
+        font-family: Calibri;
+    }
+
+
+
+
+</style>
+
+<body marginwidth="0"
+      style="background:#E0E0E0;">
+
+<header class="_header">
+    <a href="/convexhull/"
+       style="padding:1em; color: #606060; text-decoration: none; font-weight:bold; align-content: space-around;">Convex Hull Tool</a>
+</header>
+<div class="_main">
+    <div class="left">
+
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="row"><label for="fileInput">Choose a file:</label></div>
+
+            <input type="file" id="fileInput" name="fileInput" style="display: none;" onchange="updateFilePath()">
+            <div class="row"><input type="text" style="width:178px" id="filePath" name="filePath" readosnly></div>
+            <div class="row" id="_up_row">
+                <button type="button" id="Browse" style="width:90px;" onclick="document.getElementById('fileInput').click();document.getElementById('message').innerText = '';">Browse</button>
+                <button type="submit" id="Update" style="width:90px;">Upload</button>
+            </div>
+        </form>
+        <div class="row">
+            <label id="message"></label>
+        </div>
+        <form id="computeForm" enctype="multipart/form-data">
+            <div class="row"><button type="button" id="Play" style="width:180px;">Play</button></div>
+            <div class="row">
+                <label id="warning"></label>
+            </div>
+            <div class="row"><button type="button" id="Download" style="width:180px;">Download</button></div>
+
+        </form>
+        <br>
+
+        <form id="results">
+            <div class="row"><label for="volume">Volume increasing rate:</label></div>
+            <div class="row">
+                <textarea id="volume" readonly></textarea>
+            </div>
+            <div class="row">
+                <label id="volume_error"></label>
+            </div>
+            <div class="row"><a href="/convexhull/"><button type="button" id="clear" style="width:180px;">Clear</button></a></div>
+        </form>
+
+
+
+
+
+    </div>
+    <div class="right">
+
+        <section id="_execute_block">
+            <canvas id="webgl-canvas"></canvas>
+        </section>
+
+    </div>
+</div>
+
+
+<script type="text/javascript">
+
+    //button disable
+    document.getElementById("Play").disabled = true;
+    document.getElementById("Download").disabled = true;
+
+
+    // global variable
+    let fileName;
+    let final;
+    let todo = 0;
+
+    // Get the WebGL context
+    const canvas = document.getElementById('webgl-canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const gl = canvas.getContext('webgl2');
+
+    // global settings for display control
+    let time_loc;
+    let scene_type_loc;
+    let t;
+    const Axis_EBO = gl.createBuffer();
+    const Axis_VAO = gl.createVertexArray();
+    const Axis_VBO = gl.createBuffer();
+    const Scene_EBO = gl.createBuffer();
+    const Scene_VAO = gl.createVertexArray();
+    const Scene_VBO = gl.createBuffer();
+    let shaderProgram;
+    let Scene_vertices;
+    let Scene_indices;
+    let Axis_vertices;
+    let Axis_indices;
+
+
+    // file uploading
+    function updateFilePath() {
+        const filePath = document.getElementById('fileInput').value;
+        fileName = filePath.split('\\').pop();
+        document.getElementById('filePath').value = fileName;
+        document.getElementById('message').innerText = '';
+    }
+    document.getElementById('uploadForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        await fetch('/upload/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update _update_block with success message
+                    document.getElementById('message').innerText = 'File uploaded successfully';
+                    document.getElementById("Play").disabled = false;
+
+                } else {
+                    // Update _update_block with error message
+                    document.getElementById('message').innerText = 'Error: ' + data.error;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Update _update_block with error message
+                document.getElementById('message').innerText = 'An error occurred while uploading the file';
+            });
+    });
+
+    // compute
+    document.getElementById("Play").addEventListener('click', async function (event){
+        document.getElementById("warning").innerText = "Computing";
+        document.getElementById("Browse").disabled = true;
+        document.getElementById("Update").disabled = true;
+        document.getElementById("Play").disabled = true;
+        document.getElementById("Download").disabled = true;
+
+        event.preventDefault();
+        const formData = new FormData();
+        formData.append('name', JSON.stringify(fileName));
+        await fetch('/compute/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+            body: formData,
+        })
+            .then(response => response.json())
+            .then(async data => {
+                if (data.success) {
+                    document.getElementById('warning').innerText = 'Displaying';
+                    document.getElementById("Browse").disabled = false;
+                    document.getElementById("Update").disabled = false;
+                    document.getElementById("Play").disabled = false;
+                    document.getElementById("Download").disabled = false;
+                    final = [data['count'], 'obj'].join('.');
+
+                    t = Date.now();
+                    await update(Math.floor((Date.now() - t) / 100));
+                    render();
+
+                    const formData = new FormData();
+                    formData.append('input', JSON.stringify(fileName));
+                    formData.append('output', JSON.stringify(final));
+
+                    await fetch('/volume/', {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                        body: formData,
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                let change_rate = data['volume_change'] * 100;
+                                change_rate = change_rate.toFixed(4);
+                                document.getElementById('volume').innerText = `${change_rate}%`;
+                            } else {
+                                document.getElementById('volume_error').innerText = 'Error: ' + data.error;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            // Update _update_block with error message
+                            document.getElementById('volume_error').innerText = 'Volume cannot be estimated';
+                        })
+
+
+                } else {
+                    document.getElementById('warning').innerText = 'Error: ' + data.error;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Update _update_block with error message
+                document.getElementById('warning').innerText = 'An error occurred while computing';
+            });
+    })
+
+    // file downloading
+    function downloadFile(contentName, fileName) {
+        const formData = new FormData();
+        formData.append('final', JSON.stringify(contentName));
+        formData.append('name', JSON.stringify(fileName));
+
+        // Create a new XMLHttpRequest object
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/download/', true);
+        xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+        xhr.responseType = 'blob';
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                        const blob = xhr.response;
+                        const link = document.createElement('a');
+                        const url = URL.createObjectURL(blob);
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    } catch(error) {
+                        console.error('Download failed: ' + error.message);
+                    }
+                }
+            };
+        xhr.send(formData);
+        }
+    document.getElementById("Download").addEventListener('click', async function (event){
+        let Name = fileName.split('.');
+        Name[1] = 'obj';
+        Name = Name.join('.');
+        downloadFile(final, Name);
+    })
+
+    // stop calculation
+    document.getElementById("clear").addEventListener("click", function() {
+    // Send a request to the server to stop the calculations
+        fetch("/stop/", {
+            method: "POST",
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Computation stopped');
+                } else {
+                    console.error('Failed to stop computation:', data.error);
+                }
+            });
+    });
+
+    // display
+    window.onload = async function () {
+        let response;
+        let res;
+
+        if (!gl) {
+            console.error('Unable to initialize WebGL. Your browser may not support it.');
+            return;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+
+        // Set up shaders
+        const vertexShaderSource = await fetch("shaders/vertex.vert").then(res => res.json()).then(res => res["data"]).then(res => {
+            return res
+        });
+        const fragmentShaderSource = await fetch("shaders/fragment.frag").then(res => res.json()).then(res => res["data"]).then(res => {
+            return res
+        });
+
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexShaderSource);
+        gl.compileShader(vertexShader);
+        //console.log(gl.getShaderInfoLog(vertexShader));
+
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentShaderSource);
+        gl.compileShader(fragmentShader);
+        //console.log(gl.getShaderInfoLog(fragmentShader));
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        gl.useProgram(shaderProgram);
+
+        const p_matrix_loc = gl.getUniformLocation(shaderProgram, 'projection')
+        const v_matrix_loc = gl.getUniformLocation(shaderProgram, "view")
+        const p_matrix = new Float32Array([
+            1.35799513e+00, 0, 0, 0,  // First column
+            0, 2.41421356e+00, 0, 0,  // Second column
+            0, 0, -1.00000200e+00, -1,  // Third column
+            0, 0, -2.00000200e-03, 0   // Fourth column
+        ]);
+
+        let v_matrix = new Float32Array([
+            1., 0., -0., 0.,
+            -0., 1., -0., 0.,
+            0., 0., 1., 0.,
+            -0., -0., -10., 1.
+        ]);
+
+        time_loc = gl.getUniformLocation(shaderProgram, "time")
+        scene_type_loc = gl.getUniformLocation(shaderProgram, "scene_type")
+
+        gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+        gl.uniformMatrix4fv(p_matrix_loc, false, p_matrix);
+
+        // Set up geometry
+        // Axis
+        response = await fetch("a.obj/");
+        res = await response.json();
+        Axis_vertices = Float32Array.from(res["vertices"]);
+        Axis_indices = Uint32Array.from(res["indices"]);
+
+        gl.bindVertexArray(Axis_VAO);
+        gl.bindBuffer(gl.ARRAY_BUFFER, Axis_VBO);
+        gl.bufferData(gl.ARRAY_BUFFER, Axis_vertices, gl.STATIC_DRAW);
+
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 0);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Axis_EBO);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Axis_indices, gl.STATIC_DRAW);
+
+        // Scene
+        response = await fetch("cube.obj/");
+        res = await response.json();
+        Scene_vertices = Float32Array.from(res["vertices"]);
+        Scene_indices = Uint32Array.from(res["indices"]);
+
+        gl.bindVertexArray(Scene_VAO);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, Scene_VBO);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(300000), gl.DYNAMIC_DRAW);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, Scene_vertices, 0);
+
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 0);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Scene_EBO);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(300000), gl.DYNAMIC_DRAW);
+        gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, Scene_indices, 0);
+
+
+        // rotate para
+        let leftClicked = false;
+        let middleClicked = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // Event listener for mouse down event
+        canvas.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left mouse button
+                leftClicked = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
+            }
+            if (event.button === 1) { // Middle mouse button
+                middleClicked = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
+            }
+        });
+        // Event listener for mouse up event
+        canvas.addEventListener('mouseup', (event) => {
+            if (event.button === 0) { // Left mouse button
+                leftClicked = false;
+            }
+            if (event.button === 1) { // Left mouse button
+                middleClicked = false;
+            }
+        });
+        // Event listener for mouse wheel event
+        canvas.addEventListener('wheel', (event) => {
+            // Send data to Django backend
+            fetch('', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `pos_x=${event.deltaX}&pos_y=${event.deltaY * -0.1}&flag=${"wheel"}`
+            }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
+            gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+        });
+        // Event listener for mouse move event
+        canvas.addEventListener('mousemove', (event) => {
+            if (leftClicked) {
+                const deltaX = event.clientX - lastX;
+                const deltaY = event.clientY - lastY;
+
+                // Send data to Django backend
+                fetch('', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: `pos_x=${deltaX}&pos_y=${deltaY}&flag=${"left"}`
+                }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                // console.log();
+
+                // Perform rotation based on deltaX and deltaY
+                // Update your camera or model matrix here using deltaX and deltaY
+
+                lastX = event.clientX;
+                lastY = event.clientY;
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
+                gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+            }
+            if (middleClicked) {
+                const deltaX = event.clientX - lastX;
+                const deltaY = event.clientY - lastY;
+
+                // Send data to Django backend
+                fetch('', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: `pos_x=${-deltaX * 0.2}&pos_y=${deltaY * 0.2}&flag=${"middle"}`
+                }).then(res => res.json()).then(res => v_matrix = Float32Array.from(res["view"]));
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+                // console.log();
+
+                // Perform rotation based on deltaX and deltaY
+                // Update your camera or model matrix here using deltaX and deltaY
+
+                lastX = event.clientX;
+                lastY = event.clientY;
+                // document.getElementById('cameraCombined').value = `${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}\n${lastX.toFixed(2)},${lastY.toFixed(2)},${1.0}`;
+
+                gl.uniformMatrix4fv(v_matrix_loc, false, v_matrix);
+            }
+        });
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.enable(gl.DEPTH_TEST);
+
+
+
+        t = Date.now();
+        // Rendering loop
+        function render() {
+            gl.clearColor(1.0, 1.0, 1.0, 1.0);
+            gl.uniform1f(time_loc, Date.now()-t)
+
+            gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+            // Render wireframe
+            gl.uniform1i(scene_type_loc, 1);
+            gl.bindVertexArray(Scene_VAO);
+            gl.drawArrays(gl.POINTS, 0, 10000);
+
+            // axis-rendering
+            gl.uniform1i(scene_type_loc, 0);
+            gl.bindVertexArray(Axis_VAO);
+            gl.drawElements(gl.TRIANGLES, Axis_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+
+            // scene rendering
+            //gl.uniform3f(gl.getUniformLocation(shaderProgram, 'lineColor'), 0.0, 0.0, 0.0);
+            gl.uniform3f(gl.getUniformLocation(shaderProgram, 'triangleColor'), 1.0, 0.5, 0.0);
+
+            gl.uniform1i(scene_type_loc, 2);
+            gl.bindVertexArray(Scene_VAO);
+            gl.drawElements(gl.TRIANGLES, Scene_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+
+            requestAnimationFrame(render);
+        }
+
+        render();
+    };
+
+    async function update(i) {
+            const max = Number(final.split('.')[0]);
+
+            i = i*10;
+
+            if (i>max) {
+                i = max;
+            }
+
+            if(todo===i){return}
+            todo = i;
+            if (todo >= max){
+                document.getElementById("warning").innerText = "Done";
+            }
+
+            const response = await fetch(`output/${i}.obj/`);
+            const data = await response.json();
+            Scene_vertices = Float32Array.from(data["vertices"]);
+            Scene_indices = Uint32Array.from(data["indices"]);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, Scene_VBO);
+            gl.bufferData(gl.ARRAY_BUFFER, Scene_vertices, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Scene_EBO);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, Scene_indices, gl.STATIC_DRAW);
+        }
+
+    function render() {
+        gl.clearColor(1.0, 1.0, 1.0, 1.0);
+        gl.uniform1f(time_loc, Date.now()-t)
+
+        gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+        // Render wireframe
+        gl.uniform1i(scene_type_loc, 1);
+        gl.bindVertexArray(Scene_VAO);
+        gl.drawArrays(gl.POINTS, 0, 10000);
+
+        // axis-rendering
+        gl.uniform1i(scene_type_loc, 0);
+        gl.bindVertexArray(Axis_VAO);
+        gl.drawElements(gl.TRIANGLES, Axis_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+
+        // scene rendering
+        gl.uniform3f(gl.getUniformLocation(shaderProgram, 'triangleColor'), 1.0, 0.5, 0.0);
+        gl.uniform1i(scene_type_loc, 2);
+        gl.bindVertexArray(Scene_VAO);
+        gl.drawElements(gl.TRIANGLES, Scene_indices.byteLength/4, gl.UNSIGNED_INT, 0);
+
+        update(Math.floor((Date.now()-t)/ 100));
+        requestAnimationFrame(render);
+        }
+
+
+</script>
+
+
+</body>
+</html>
